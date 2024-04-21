@@ -1,0 +1,55 @@
+#!/usr/bin/env php
+<?php
+
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
+use Doctrine\DBAL\DriverManager;
+use Doctrine\Migrations\Configuration\Connection\ExistingConnection;
+use Doctrine\Migrations\Configuration\Migration\PhpFile;
+use Doctrine\Migrations\DependencyFactory;
+use Dotenv\Dotenv;
+use Symfony\Component\Console\Application;
+use Doctrine\Migrations\Tools\Console\Command;
+
+$dotenv = Dotenv::createUnsafeImmutable(__DIR__ . '/../');
+$dotenv->load();
+
+$config = new PhpFile(file: dirname(__DIR__) . '/resources/database/migration-config.php');
+
+$conn = DriverManager::getConnection(
+    [
+        'dbname' => getenv('DB_DATABASE'),
+        'user' => getenv('DB_USERNAME'),
+        'password' => getenv('DB_PASSWORD'),
+        'host' => getenv('DB_HOST'),
+        'port' => (int)getenv('DB_PORT'),
+        'driver' => getenv('DB_DRIVER'),
+    ]
+);
+
+$dependencyFactory = DependencyFactory::fromConnection(
+    configurationLoader: $config,
+    connectionLoader: new ExistingConnection($conn)
+);
+
+$cli = new Application('Doctrine Migrations');
+$cli->setCatchExceptions(true);
+
+$cli->addCommands(array(
+    new Command\DumpSchemaCommand($dependencyFactory),
+    new Command\ExecuteCommand($dependencyFactory),
+    new Command\GenerateCommand($dependencyFactory),
+    new Command\LatestCommand($dependencyFactory),
+    new Command\ListCommand($dependencyFactory),
+    new Command\RollupCommand($dependencyFactory),
+    new Command\StatusCommand($dependencyFactory),
+    new Command\SyncMetadataCommand($dependencyFactory),
+    new Command\VersionCommand($dependencyFactory),
+    new Command\MigrateCommand($dependencyFactory),
+));
+
+try {
+    $cli->run();
+} catch (Exception $e) {
+    dd($e->getMessage());
+}
